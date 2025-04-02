@@ -1,31 +1,36 @@
-# This workflow will build and push a new container image to Amazon ECR,
-# and then will deploy a new task definition to Amazon ECS, when there is a push to the "main" branch.
-#
-# This workflow is taken from: https://docs.github.com/en/actions/use-cases-and-examples/deploying/deploying-to-amazon-elastic-container-service
-
-name: Deploy to Amazon ECS
+name: Reusable Deploy to Amazon ECS
 
 on:
-    workflow_call:
-
-env:
-  AWS_REGION: ap-southeast-2                        # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: analyticsamd                      # set this to your Amazon ECR repository name
-  ECS_SERVICE: analyticsEC2service                  # set this to your Amazon ECS service name
-  ECS_CLUSTER: AnalyticsClusterEC2                  # set this to your Amazon ECS cluster name
-  ECS_TASK_DEFINITION: .aws/td2-amd-revision2.json  # set this to the path to your Amazon ECS task definition
-                                                    # file, e.g. .aws/task-definition.json
-  CONTAINER_NAME: analyticsamd                      # set this to the name of the container in the
-                                                    # containerDefinitions section of your task definition
-
-permissions:
-  contents: read
+  workflow_call:
+    inputs:
+      aws-region:
+        required: true
+        type: string
+      ecr-repository:
+        required: true
+        type: string
+      ecs-service:
+        required: true
+        type: string
+      ecs-cluster:
+        required: true
+        type: string
+      ecs-task-definition:
+        required: true
+        type: string
+      container-name:
+        required: true
+        type: string
+    secrets:
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
 
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    # environment: production
 
     steps:
     - name: Checkout
@@ -34,9 +39,9 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-access-key-id: ${{ secrets.aws-access-key-id }}
+        aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+        aws-region: ${{ inputs.aws-region }}
 
     - name: Login to Amazon ECR
       id: login-ecr
@@ -48,25 +53,22 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build a docker container and
-        # push it to ECR so that it can
-        # be deployed to ECS.
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        docker build -t $ECR_REGISTRY/${{ inputs.ecr-repository }}:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/${{ inputs.ecr-repository }}:$IMAGE_TAG
+        echo "image=$ECR_REGISTRY/${{ inputs.ecr-repository }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
-        task-definition: ${{ env.ECS_TASK_DEFINITION }}
-        container-name: ${{ env.CONTAINER_NAME }}
+        task-definition: ${{ inputs.ecs-task-definition }}
+        container-name: ${{ inputs.container-name }}
         image: ${{ steps.build-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
+        service: ${{ inputs.ecs-service }}
+        cluster: ${{ inputs.ecs-cluster }}
         wait-for-service-stability: true
