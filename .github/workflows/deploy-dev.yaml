@@ -39,7 +39,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-region: ${{ inputs.aws-region }}
         aws-access-key-id: ${{ secrets.aws-access-key-id }}
