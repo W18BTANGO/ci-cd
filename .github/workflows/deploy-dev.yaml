@@ -38,12 +38,14 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Configure AWS credentials (Dev)
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.aws-access-key-id }}
-        aws configure set aws_secret_access_key ${{ secrets.aws-secret-access-key }}
-        aws configure set aws_session_token ${{ secrets.aws-session-token }}
-        aws configure set region ${{ inputs.aws-region }}
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: ${{ inputs.aws-region }}
+        aws-access-key-id: ${{ secrets.aws-access-key-id }}
+        aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+        aws-session-token: ${{ secrets.aws-session-token }}
+
 
     - name: Login to Amazon ECR
       id: login-ecr
